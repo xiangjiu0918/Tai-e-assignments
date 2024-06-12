@@ -25,8 +25,13 @@ package pascal.taie.analysis.dataflow.analysis;
 import pascal.taie.analysis.dataflow.fact.SetFact;
 import pascal.taie.analysis.graph.cfg.CFG;
 import pascal.taie.config.AnalysisConfig;
+import pascal.taie.ir.exp.LValue;
+import pascal.taie.ir.exp.RValue;
 import pascal.taie.ir.exp.Var;
 import pascal.taie.ir.stmt.Stmt;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of classic live variable analysis.
@@ -64,7 +69,27 @@ public class LiveVariableAnalysis extends
 
     @Override
     public boolean transferNode(Stmt stmt, SetFact<Var> in, SetFact<Var> out) {
-        // TODO - finish me
-        return false;
+        //因为判断input fact是否发生改变，所以要copy一份作为临时变量
+        SetFact<Var> tmpIn=out.copy();
+        //stmt中使用到的变量
+        List<RValue> uses=stmt.getUses();
+        //stmt中定义的变量
+        Optional<LValue> def=stmt.getDef();
+        //def存在才可以get，还要判断取到的是不是变量
+        if(def.isPresent()&&def.get() instanceof Var defVar){
+            //如果是，就从tmpin中删除,对应公式IN[B]-def
+            tmpIn.remove(defVar);
+        }
+        //因为只要变量使用，则变量就在该处活跃，所以adduse必须在Movedef后面
+        for(RValue use:uses){
+            if(use instanceof Var useVar){
+                tmpIn.add(useVar);
+            }
+        }
+        //判断input fact是否发生改变
+        boolean change = !in.equals(tmpIn);
+        //更新input fact
+        in.set(tmpIn);
+        return change;
     }
 }
